@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - agent
-      
+
 jobs:
   all-in-one:
     name: Aqua scanner
@@ -25,11 +25,12 @@ jobs:
       TRIVY_DB_REPOSITORY: "registry.aquasec.com/trivy-db:2"
       TRIVY_JAVA_DB_REPOSITORY: "registry.aquasec.com/trivy-java-db:1"
       TRIVY_CHECKS_BUNDLE_REPOSITORY: "registry.aquasec.com/trivy-checks:1"
-      OVERRIDE_SOURCE_BRANCH: "main"
-      
+      OVERRIDE_SOURCE_BRANCH: "agent"
+      OVERRIDE_BRANCH: "agent"
+
     permissions:
         id-token: write
-    
+
     steps:
       - name: Maximize build space
         uses: easimon/maximize-build-space@v10
@@ -41,6 +42,13 @@ jobs:
           remove-haskell: 'true'
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo docker system prune -af
+          df -h
       - name: Run Aqua scanner
         uses: docker://aquasec/aqua-scanner
         with:
