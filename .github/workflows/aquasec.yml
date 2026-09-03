@@ -1,13 +1,21 @@
-name: aqua-code-scan-agent
+# Filesystem scan with Aqua Supply Chain integration (results flow to Aqua Hub via lake connector).
+# Based on GitHub's Trivy template, customized for code-repo scanning (no Docker image build).
+
+name: trivy
+
 on:
   push:
-    branches:
-      - agent
+    branches: [main, agent]
+  pull_request:
+    branches: [main, agent]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  scan-only:
-    name: Aqua code scan (agent branch)
+  build:
+    name: Trivy code scan
     runs-on: ubuntu-latest
     environment: crossdep
     env:
@@ -19,28 +27,22 @@ jobs:
       TRIVY_DB_REPOSITORY: registry.aquasec.com/trivy-db:2
       TRIVY_JAVA_DB_REPOSITORY: registry.aquasec.com/trivy-java-db:1
       TRIVY_CHECKS_BUNDLE_REPOSITORY: registry.aquasec.com/trivy-checks:1
-      OVERRIDE_BRANCH: agent
-      OVERRIDE_SOURCE_BRANCH: agent
+      OVERRIDE_BRANCH: ${{ github.ref_name }}
+      OVERRIDE_SOURCE_BRANCH: ${{ github.ref_name }}
 
     steps:
-      - name: Maximize build space
-        uses: easimon/maximize-build-space@v10
-        with:
-          root-reserve-mb: 6144
-          remove-android: true
-          remove-dotnet: true
-          remove-haskell: true
-          remove-docker-images: true
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Free disk space
+
+      - name: Build an image from Dockerfile
         run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo docker system prune -af
-          df -h
-      - name: Run Aqua scanner
-        uses: docker://aquasec/aqua-scanner:latest-limited
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          trivy plugin install aqua
+
+      - name: Run Trivy filesystem scan (Supply Chain)
+        uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
         with:
-          args: trivy fs --scanners config,vuln,secret . --sast
+          scan-type: fs
+          scan-ref: .
+          scanners: config,vuln,secret
+          trivy-args: --sast
